@@ -12,8 +12,8 @@ const analyzeSignal = async (text, imageUrl = null) => {
       return fallbackHeuristic(text);
     }
 
-    // Auto-detects GEMINI_API_KEY natively from the environment variable
-    const ai = new GoogleGenAI(); 
+    // Standardized instantiation for v1.x of the Google GenAI SDK
+    const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY); 
 
     const prompt = `You are a critical disaster response AI for AidSphere, an emergency management protocol.
 Analyze the following social media post (and verify the attached image if present) to determine if it uniquely represents a genuine physical crisis/emergency requiring human intervention (like floods, fires, collapses, or urgent medical shortage).
@@ -56,10 +56,10 @@ Provide your assessment in strict, raw JSON format matching exactly this schema:
     parts.push({ text: prompt });
 
     console.log(`[Gemini] Transmitting multi-modal payload to Google GenEarth Node...`);
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response = await model.generateContent({
       contents: [{ role: 'user', parts: parts }],
-      config: {
+      generationConfig: {
         responseMimeType: "application/json"
       }
     });
