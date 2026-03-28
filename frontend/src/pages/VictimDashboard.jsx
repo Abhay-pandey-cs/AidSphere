@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useContext } from 'react';
 import API from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
-import { ShieldAlert, MapPin, Clock, CheckCircle, AlertCircle, ArrowRight, MessageSquare, Activity, Target } from 'lucide-react';
+import { ShieldAlert, MapPin, Clock, CheckCircle, AlertCircle, ArrowRight, MessageSquare, Activity, Target, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import SocialMonitor from './SocialMonitor';
 
 const VictimDashboard = () => {
   const { user } = useContext(AuthContext);
@@ -66,9 +67,15 @@ const VictimDashboard = () => {
                  >
                    <Activity size={20} /> Global Threat Intel
                  </button>
+                 <button 
+                   onClick={() => setActiveTab('intel')}
+                   className={`text-xl font-black flex items-center gap-3 italic uppercase tracking-tighter transition-all ${activeTab === 'intel' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                 >
+                   <Globe size={20} /> Live Intel
+                 </button>
               </div>
               <div className="bg-gray-900 px-4 py-2 text-[10px] font-black text-white uppercase tracking-widest">
-                Nodes active: {activeTab === 'mine' ? mySOS.length : globalSOS.length}
+                Nodes active: {activeTab === 'mine' ? mySOS.length : activeTab === 'global' ? globalSOS.length : 'SYNC'}
               </div>
            </div>
 
@@ -133,7 +140,7 @@ const VictimDashboard = () => {
                      </div>
                   </div>
                 ))
-              ) : (
+              ) : activeTab === 'global' ? (
                 globalSOS.length === 0 ? (
                   <div className="bg-gray-50 p-24 border border-gray-200 text-center">
                      <MessageSquare size={48} className="text-gray-200 mx-auto mb-6" />
@@ -162,7 +169,11 @@ const VictimDashboard = () => {
                      </div>
                   </div>
                 ))
-              )}
+              ) : activeTab === 'intel' ? (
+                <div className="bg-gray-50/50 min-h-[500px] border border-gray-100 rounded-2xl relative">
+                  <SocialMonitor />
+                </div>
+              ) : null}
            </div>
         </div>
 

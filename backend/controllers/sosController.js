@@ -1,23 +1,39 @@
 const SOS = require('../models/SOS');
 const analyzeDistress = require('../utils/distressDetector');
+const { analyzeSignal } = require('../utils/geminiAnalyzer');
 
 // @desc    Create new SOS request
 // @route   POST /api/sos
 // @access  Private
 const createSOS = async (req, res) => {
-  const { type, description, location, urgency } = req.body;
+  const { type, description, location, urgency, photo } = req.body;
 
   try {
-    // Intelligent distress detection
-    const analysis = analyzeDistress(description);
-    
-    // Higher of user-provided urgency and detected urgency
-    const finalUrgency = urgency || analysis.priority;
+    let finalUrgency = urgency;
+    let finalDescription = description;
+
+    if (photo) {
+      // Deep Gemini Image+Text Analysis
+      const aiEvaluation = await analyzeSignal(description, photo);
+      
+      if (!aiEvaluation.isDisaster) {
+        return res.status(400).json({ 
+          message: `SOS Request Blocked by Neural Protocol: ${aiEvaluation.aiReasoning}` 
+        });
+      }
+      
+      finalUrgency = aiEvaluation.urgency === 'critical' || aiEvaluation.urgency === 'high' ? aiEvaluation.urgency : finalUrgency;
+      finalDescription = `${description}\n\n[NEURAL CAMERA VERIFIED: ${aiEvaluation.aiReasoning} // SENTIMENT: ${aiEvaluation.sentiment}]`;
+    } else {
+      // Legacy text-only heuristic fallback if no photo
+      const analysis = analyzeDistress(description);
+      finalUrgency = urgency || analysis.priority;
+    }
 
     const sos = await SOS.create({
       user: req.user._id,
       type,
-      description,
+      description: finalDescription,
       location,
       urgency: finalUrgency,
       logs: [{
@@ -132,9 +148,37 @@ const updateSOSStatus = async (req, res) => {
   }
 };
 
+// @desc    Analyze live camera frames
+// @route   POST /api/sos/analyze-frame
+// @access  Private
+const analyzeFrame = async (req, res) => {
+  const { photo } = req.body;
+  if (!photo) return res.status(400).json({ message: 'No frame provided' });
+
+  try {
+    const aiEvaluation = await analyzeSignal("Visual scene scan only. Describe the scene briefly. Is there an absolute, critical physical emergency requiring SOS responders? Be very strict. Focus on physical disaster, fire, accident, or flood.", photo);
+    
+    // Explicitly clamp distress score if it's perfectly safe
+    let finalScore = aiEvaluation.confidenceScore || 0;
+    if (!aiEvaluation.isDisaster) {
+       finalScore = Math.min(finalScore, 40); // Cap safe scenes
+       if (finalScore === 0) finalScore = Math.floor(Math.random() * 10) + 1; // 1-10 nominal
+    }
+
+    res.json({
+      distressScore: finalScore,
+      sentiment: aiEvaluation.sentiment || (aiEvaluation.isDisaster ? 'critical' : 'scene nominal (safe)'),
+      isDisaster: aiEvaluation.isDisaster
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   createSOS,
   getAllSOS,
   getSOSById,
   updateSOSStatus,
+  analyzeFrame,
 };

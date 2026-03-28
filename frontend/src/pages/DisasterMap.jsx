@@ -3,8 +3,9 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import API from '../api/axios';
+import { AuthContext } from '../context/AuthContext';
 import { SocketContext } from '../context/SocketContext';
-import { ShieldAlert, MapPin, User, Clock, Activity, Target } from 'lucide-react';
+import { ShieldAlert, MapPin, User, Clock, Activity, Target, Filter } from 'lucide-react';
 
 // Fix for default marker icons
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -45,7 +46,7 @@ const SOSMarker = ({ sos }) => {
   );
 };
 
-const HotspotMarker = ({ spot }) => {
+const HotspotMarker = ({ spot, isNearby }) => {
   return (
     <Popup className="industrial-popup">
         <div className="p-5 min-w-[300px] space-y-4 bg-gray-900 text-white border-l-4 border-blue-600">
@@ -95,6 +96,16 @@ const HotspotMarker = ({ spot }) => {
              </div>
           </div>
           
+          <a 
+            href={spot.link || '#'} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className={`block text-center w-full py-3 mb-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-lg border ${
+              isNearby ? 'border-red-500 text-red-500 bg-red-900/20 hover:bg-red-900/40' : 'border-gray-600 text-gray-400 hover:text-gray-200 bg-gray-800'
+            }`}
+          >
+             {isNearby ? 'NEARBY THREAT - VIEW SOURCE' : 'Review Source Origin'}
+          </a>
           <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-lg">
              Convert to SOS Request
           </button>
@@ -107,7 +118,24 @@ const DisasterMap = () => {
   const [sosRequests, setSosRequests] = useState([]);
   const [hotspots, setHotspots] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [radiusFilter, setRadiusFilter] = useState('all'); // all, 10, 50, 100, 500
   const socket = useContext(SocketContext);
+  const { user } = useContext(AuthContext);
+
+  const calculateDistance = (lat1, lng1, lat2, lng2) => {
+    if (!lat1 || !lng1 || !lat2 || !lng2) return Infinity;
+    const pt1 = L.latLng(lat1, lng1);
+    const pt2 = L.latLng(lat2, lng2);
+    return pt1.distanceTo(pt2) / 1000; // Return in kilometers
+  };
+
+  const withinRadius = (itemLoc) => {
+    if (radiusFilter === 'all') return true;
+    const centerLat = user?.location?.lat || 20.5937;
+    const centerLng = user?.location?.lng || 78.9629;
+    const distanceKm = calculateDistance(centerLat, centerLng, itemLoc?.lat, itemLoc?.lng);
+    return distanceKm <= parseInt(radiusFilter);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -124,9 +152,10 @@ const DisasterMap = () => {
           text: post.content,
           location: post.location,
           confidence: post.confidence,
-          sentiment: post.analysis?.sentiment || 'warning',
+          sentiment: post.sentiment || 'warning',
           timestamp: new Date(post.timestamp).toLocaleTimeString() + ' (L-SYNC)',
-          source: post.platform
+          source: post.platform,
+          link: post.link
         }));
         
         setHotspots(mappedHotspots);
@@ -178,8 +207,25 @@ const DisasterMap = () => {
                 </span>
                 <p className="text-[9px] font-mono text-gray-400">CONFIDENCE: 80%+</p>
              </div>
-             <span className="data-value text-2xl text-gray-900">{hotspots.length}</span>
+             <span className="data-value text-2xl text-gray-900">{hotspots.filter(h => withinRadius(h.location)).length}</span>
            </div>
+        </div>
+
+        <div className="pt-4 border-t border-gray-900/10 space-y-3">
+           <label className="text-[9px] font-black uppercase tracking-widest flex items-center gap-2 text-gray-500">
+             <Filter size={12} /> Proximity Radius
+           </label>
+           <select 
+             value={radiusFilter}
+             onChange={(e) => setRadiusFilter(e.target.value)}
+             className="w-full bg-gray-50 border border-gray-200 p-2 text-xs font-bold text-gray-700 outline-none hover:border-blue-400 transition-all"
+           >
+             <option value="all">Global Array (All)</option>
+             <option value="10">10 km Radius</option>
+             <option value="50">50 km Radius</option>
+             <option value="100">100 km Radius</option>
+             <option value="500">500 km Radius</option>
+           </select>
         </div>
 
         <div className="pt-4 flex items-center gap-2 tactical-text text-[9px] text-gray-300">
@@ -192,7 +238,7 @@ const DisasterMap = () => {
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
-        {sosRequests.map((sos) => (
+        {sosRequests.filter(sos => withinRadius(sos.location)).map((sos) => (
           <Marker 
             key={sos._id} 
             position={[sos.location.lat, sos.location.lng]}
@@ -201,15 +247,19 @@ const DisasterMap = () => {
             <SOSMarker sos={sos} />
           </Marker>
         ))}
-        {hotspots.map((spot) => (
+        {hotspots.filter(spot => withinRadius(spot.location)).map((spot) => {
+          const centerLat = user?.location?.lat || 20.5937;
+          const centerLng = user?.location?.lng || 78.9629;
+          const distKm = calculateDistance(centerLat, centerLng, spot.location.lat, spot.location.lng);
+          return (
           <Marker 
             key={spot._id} 
             position={[spot.location.lat, spot.location.lng]}
             eventHandlers={{ click: () => setSelectedItem({ ...spot, type: 'NEURAL_HOTSPOT' }) }}
           >
-            <HotspotMarker spot={spot} />
+            <HotspotMarker spot={spot} isNearby={distKm < 20} />
           </Marker>
-        ))}
+        )})}
       </MapContainer>
 
       {/* Strategic Intelligence Sidebar */}

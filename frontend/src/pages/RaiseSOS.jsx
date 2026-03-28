@@ -83,7 +83,8 @@ const RaiseSOS = () => {
         location: finalLocation,
         urgency: aiData?.urgency || selectedCategory.severity,
         aiDistressScore: aiData?.distressScore,
-        aiSentiment: aiData?.sentiment
+        aiSentiment: aiData?.sentiment,
+        photo: aiData?.photo
       });
       setSuccess(true);
       setTimeout(() => navigate('/dashboard'), 3000);

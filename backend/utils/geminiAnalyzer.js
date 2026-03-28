@@ -20,6 +20,8 @@ Analyze the following social media post (and verify the attached image if presen
 
 Strictly identify and drop (isDisaster: false) spam, memes, political opinions, hypotheticals, minor civilian complaints, or false alarms.
 
+Perform a deep, context-aware sentiment analysis on the ENTIRE paragraph. Do NOT rely on isolated keywords. Evaluate the comprehensive tone, emotional severity, and objective distress conveyed by the overall narrative to determine the appropriate sentiment.
+
 Text Content:
 "${text}"
 
@@ -29,6 +31,7 @@ Provide your assessment in strict, raw JSON format matching exactly this schema:
   "urgency": string (one of: "low", "medium", "high", "critical"),
   "category": string (e.g., "flood", "medical", "fire_safety", "structural", "hazard", "other"),
   "confidenceScore": number (0 to 100),
+  "sentiment": string (e.g., "negative", "neutral", "positive", "warning", "panic"),
   "aiReasoning": string (Short 1 sentence explanation of your decision)
 }`;
 
@@ -37,19 +40,29 @@ Provide your assessment in strict, raw JSON format matching exactly this schema:
     // Feature: Visual Intelligence (Image Processing)
     if (imageUrl) {
       try {
-        const imageResp = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 6000 });
-        const mimeType = imageResp.headers['content-type'] || 'image/jpeg';
-        const base64Data = Buffer.from(imageResp.data, 'binary').toString('base64');
-        
-        parts.push({
-           inlineData: {
-              data: base64Data,
-              mimeType: mimeType
-           }
-        });
-        console.log(`[Gemini] Successfully fetched attachment: ${imageUrl.substring(0, 30)}...`);
+        if (imageUrl.startsWith('data:image/')) {
+          // Internal UI Camera Base64
+          const partsStr = imageUrl.split(',');
+          const mimeTypeMatch = partsStr[0].match(/:(.*?);/);
+          const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+          const base64Data = partsStr[1];
+          parts.push({
+             inlineData: { data: base64Data, mimeType }
+          });
+          console.log(`[Gemini] Processed raw camera base64 array.`);
+        } else {
+          // External link
+          const imageResp = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 6000 });
+          const mimeType = imageResp.headers['content-type'] || 'image/jpeg';
+          const base64Data = Buffer.from(imageResp.data, 'binary').toString('base64');
+          
+          parts.push({
+             inlineData: { data: base64Data, mimeType }
+          });
+          console.log(`[Gemini] Successfully fetched attachment: ${imageUrl.substring(0, 30)}...`);
+        }
       } catch(e) {
-        console.error("[Gemini] Failed to fetch image, proceeding text-only:", e.message);
+        console.error("[Gemini] Failed to fetch/parse image, proceeding text-only:", e.message);
       }
     }
     
@@ -60,7 +73,8 @@ Provide your assessment in strict, raw JSON format matching exactly this schema:
     const response = await model.generateContent({
       contents: [{ role: 'user', parts: parts }],
       generationConfig: {
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        maxOutputTokens: 250 // Using only required tokens to minimize latency/cost
       }
     });
 
@@ -86,6 +100,7 @@ const fallbackHeuristic = (text) => {
     urgency: "high",
     category: "other",
     confidenceScore: 75,
+    sentiment: "warning",
     aiReasoning: "Fallback semantic heuristic applied (No active Gemini Key provisioned)."
   };
 };

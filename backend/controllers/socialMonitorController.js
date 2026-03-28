@@ -74,6 +74,7 @@ const triggerScrape = async (req, res) => {
           link: `https://reddit.com${data.permalink}`,
           neuralScore: aiEvaluation.confidenceScore,
           confidence: aiEvaluation.confidenceScore,
+          sentiment: aiEvaluation.sentiment || 'warning',
           rawCategory: aiEvaluation.category || data.subreddit_name_prefixed
         });
       }
@@ -95,17 +96,25 @@ const triggerScrape = async (req, res) => {
           const title = report.fields.title;
           const body = report.fields.body ? report.fields.body.substring(0, 300).replace(/<[^>]*>?/gm, '') : title;
           
+          const aiEvaluation = await analyzeSignal(`${title}. ${body}`);
+          
+          if (!aiEvaluation.isDisaster) {
+            console.log(`[ReliefWeb] Gemini Dropped: "${title}" - Reason: ${aiEvaluation.aiReasoning}`);
+            continue; 
+          }
+          
           newSignals.push({
             originalId: `reliefweb_${report.id}`,
             platform: 'RELIEF_WEB',
             author: 'NGO_OFFICIAL',
-            content: body,
+            content: `${body}\n\n[AI_VERIFIED: ${aiEvaluation.aiReasoning}]`,
             timestamp: new Date(report.fields.date.created),
             location: { region: geoContext.region },
             link: report.fields.url_alias || report.fields.url,
-            neuralScore: 90 + Math.random() * 9,
-            confidence: 99.9,
-            rawCategory: 'Official NGO Alert'
+            neuralScore: aiEvaluation.confidenceScore,
+            confidence: aiEvaluation.confidenceScore,
+            sentiment: aiEvaluation.sentiment || 'warning',
+            rawCategory: aiEvaluation.category || 'Official NGO Alert'
           });
         }
       }
@@ -119,17 +128,26 @@ const triggerScrape = async (req, res) => {
       const events = eonetRes.data?.events || [];
       
       for (const event of events) {
+        if (!event.title) continue;
+        
+        const aiEvaluation = await analyzeSignal(`NASA EONET Alert: ${event.title}`);
+        
+        if (!aiEvaluation.isDisaster) {
+          continue; 
+        }
+
         newSignals.push({
           originalId: `nasa_eonet_${event.id}`,
           platform: 'NASA_EONET',
           author: 'NASA_SYSTEM',
-          content: `Global Disaster Intelligence: ${event.title}. Verified by NASA Earth Observatory.`,
+          content: `Global Disaster Intelligence: ${event.title}. Verified by NASA Earth Observatory.\n\n[AI_VERIFIED: ${aiEvaluation.aiReasoning}]`,
           timestamp: new Date(event.geometry[0]?.date || new Date()),
           location: { region: 'GLOBAL' },
           link: event.sources[0]?.url || 'https://eonet.gsfc.nasa.gov',
-          neuralScore: 95,
-          confidence: 99.9,
-          rawCategory: event.categories[0]?.title || 'Natural Disaster'
+          neuralScore: aiEvaluation.confidenceScore,
+          confidence: aiEvaluation.confidenceScore,
+          sentiment: aiEvaluation.sentiment || 'warning',
+          rawCategory: aiEvaluation.category || event.categories[0]?.title || 'Natural Disaster'
         });
       }
     } catch (err) {
@@ -164,6 +182,7 @@ const triggerScrape = async (req, res) => {
           link: status.url,
           neuralScore: aiEvaluation.confidenceScore,
           confidence: aiEvaluation.confidenceScore,
+          sentiment: aiEvaluation.sentiment || 'warning',
           rawCategory: aiEvaluation.category || '#emergency'
         });
       }
@@ -181,7 +200,7 @@ const triggerScrape = async (req, res) => {
       
       if (aiEvaluation.isDisaster) {
         newSignals.push({
-          originalId: `mock_verified_${Date.now()}`,
+          originalId: 'mock_verified_seed', // Fixed duplicacy bug
           platform: 'GEMINI_VISION_TEST',
           author: 'AI_Test_Node',
           content: `${mockText}\n\n[AI_VISION_VERIFIED: ${aiEvaluation.aiReasoning}]`,
@@ -190,6 +209,7 @@ const triggerScrape = async (req, res) => {
           link: mockImageUrl, 
           neuralScore: aiEvaluation.confidenceScore,
           confidence: aiEvaluation.confidenceScore,
+          sentiment: aiEvaluation.sentiment || 'critical',
           rawCategory: aiEvaluation.category
         });
       }

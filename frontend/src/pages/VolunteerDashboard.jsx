@@ -3,6 +3,7 @@ import API from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import { ShieldCheck, ShieldAlert, Clock, MapPin, CheckCircle, ArrowRight, Award, Activity, Zap, Navigation, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import SocialMonitor from './SocialMonitor';
 
 const getDistance = (lat1, lon1, lat2, lon2) => {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -160,6 +161,12 @@ const VolunteerDashboard = () => {
                  >
                     Regional Open SOS ({filteredRegional.length})
                  </button>
+                 <button 
+                   onClick={() => setActiveTab('intel')}
+                   className={`text-lg xl:text-xl font-bold transition-all whitespace-nowrap ${activeTab === 'intel' ? 'text-slate-900 border-b-2 border-slate-900 pb-1' : 'text-slate-400 hover:text-slate-600'}`}
+                 >
+                    Signal Intel
+                 </button>
               </div>
               
               {activeTab === 'regional' && (
@@ -211,6 +218,10 @@ const VolunteerDashboard = () => {
                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">No Open SOS Signals</p>
                    <p className="text-xs font-medium text-slate-400 mt-2 hover:underline cursor-pointer" onClick={() => setDistanceFilter('global')}>Expand Search Radius</p>
                 </div>
+              ) : activeTab === 'intel' ? (
+                 <div className="bg-slate-50/50 min-h-[500px] border border-slate-200 rounded-3xl overflow-hidden relative">
+                    <SocialMonitor />
+                 </div>
               ) : (activeTab === 'assigned' ? assignedMissions : filteredRegional).map(m => {
                  const dist = userLoc && m.location?.lat ? getDistance(userLoc.lat, userLoc.lng, m.location.lat, m.location.lng) : null;
                  return (

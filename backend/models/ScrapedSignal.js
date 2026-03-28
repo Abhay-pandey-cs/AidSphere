@@ -16,6 +16,7 @@ const scrapedSignalSchema = new mongoose.Schema({
   confidence: { type: Number, default: 90 },
   impactRadius: { type: String, default: '5km' },
   analysis: { type: String, default: 'Pending L1 Scan' },
+  sentiment: { type: String, default: 'warning' },
   rawCategory: { type: String, default: 'General Emergency' },
   upvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   status: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' }

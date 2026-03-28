@@ -1,15 +1,17 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, X, ShieldAlert, Cpu, Activity, Zap, Info } from 'lucide-react';
+import API from '../api/axios';
 
 const SOSCamera = ({ onCapture, onClose }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
   const [distressScore, setDistressScore] = useState(0);
-  const [sentiment, setSentiment] = useState('Analysing...');
-  const [analyzing, setAnalyzing] = useState(true);
+  const [sentiment, setSentiment] = useState('AWAITING_SCAN');
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
+    let activeStream = null;
     const startCamera = async () => {
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -17,27 +19,48 @@ const SOSCamera = ({ onCapture, onClose }) => {
         });
         videoRef.current.srcObject = mediaStream;
         setStream(mediaStream);
+        activeStream = mediaStream;
       } catch (err) {
-        console.error("Camera access denied:", err);
+        console.warn("Environment camera access denied, falling back to front/default lens:", err);
+        try {
+           const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+           videoRef.current.srcObject = fallbackStream;
+           setStream(fallbackStream);
+           activeStream = fallbackStream;
+        } catch (fallbackErr) {
+           console.error("Total camera failure:", fallbackErr);
+           setSentiment('CAMERA_HARDWARE_ERROR');
+        }
       }
     };
     startCamera();
 
-    // Neural Analysis Simulation Loop (Real-time Frame Analysis Mock)
-    const interval = setInterval(() => {
-      const score = Math.floor(Math.random() * 40) + 30;
-      setDistressScore(score);
-      
-      if (score > 60) setSentiment('CRITICAL_SIGNAL_DETECTED');
-      else if (score > 50) setSentiment('HIGH_ANXIETY_DETECTED');
-      else setSentiment('SCENE_NOMINAL_SYNC');
-    }, 1500);
-
     return () => {
-      clearInterval(interval);
-      if (stream) stream.getTracks().forEach(track => track.stop());
+      if (activeStream) activeStream.getTracks().forEach(track => track.stop());
     };
   }, []);
+
+  const handleAnalyzeFrame = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    setAnalyzing(true);
+    setSentiment("TRANSMITTING_TO_NEURAL_NODE...");
+    try {
+      const context = canvasRef.current.getContext('2d');
+      canvasRef.current.width = videoRef.current.videoWidth;
+      canvasRef.current.height = videoRef.current.videoHeight;
+      context.drawImage(videoRef.current, 0, 0);
+      const photoData = canvasRef.current.toDataURL('image/jpeg', 0.8);
+
+      const { data } = await API.post('/sos/analyze-frame', { photo: photoData });
+      setDistressScore(data.distressScore);
+      setSentiment(data.sentiment.toUpperCase());
+    } catch (err) {
+      setSentiment('ANALYSIS_FAILED');
+      console.error(err);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const handleCapture = () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -145,8 +168,15 @@ const SOSCamera = ({ onCapture, onClose }) => {
 
            <div className="space-y-4 pt-12">
               <button 
+                 onClick={handleAnalyzeFrame}
+                 disabled={analyzing}
+                 className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-3 transition-all active:scale-95 shadow-xl shadow-blue-900/50 disabled:opacity-50"
+               >
+                 {analyzing ? 'Scanning...' : 'Analyze Scene'} <Cpu size={18} />
+               </button>
+              <button 
                 onClick={handleCapture}
-                className="w-full py-5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-[0.5em] flex items-center justify-center gap-3 transition-all active:scale-95 shadow-xl shadow-red-900/50"
+                className="w-full py-5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-3 transition-all active:scale-95 shadow-xl shadow-red-900/50"
               >
                 Capture & Broadcast <Zap size={18} />
               </button>
