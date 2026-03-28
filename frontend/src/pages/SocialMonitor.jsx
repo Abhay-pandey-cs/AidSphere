@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
 import API from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
-import { Share2, ShieldAlert, CheckCircle, ExternalLink, RefreshCw, Activity, Zap, Info, ArrowUp } from 'lucide-react';
+import { Share2, ShieldAlert, CheckCircle, ExternalLink, RefreshCw, Activity, Zap, Info, ArrowUp, XCircle, Trash2 } from 'lucide-react';
 import { FeedSkeleton } from '../components/Skeleton';
 
 const SocialMonitor = () => {
@@ -51,25 +51,41 @@ const SocialMonitor = () => {
     }
   };
 
-  const handleAssignForce = async (post) => {
+  const handleConvertToSOS = async (post) => {
     try {
-      await API.post('/sos', {
-        type: 'Extracted Neural Signal',
-        category: 'other',
-        description: `[INTEL SOURCE: ${post.platform}] ${post.content}`,
-        location: { address: post.location?.region || 'UNKNOWN' },
-        urgency: post.neuralScore > 80 ? 'critical' : post.neuralScore > 50 ? 'high' : 'medium',
-        aiDistressScore: post.neuralScore,
-      });
-      // Remove from pending intel feed
+      await API.post(`/social-monitor/convert/${post._id}`);
+      // Remove from pending intel feed with a visual flair if possible, but for now just filter
       setPosts(prev => prev.filter(p => p._id !== post._id));
     } catch (err) {
-      console.error('Failed to dispatch force:', err);
+      console.error('Failed to convert signal to SOS:', err);
+      alert(err.response?.data?.message || 'Error converting signal');
+    }
+  };
+
+  const handleDismiss = async (id) => {
+    if (!window.confirm("PERMANENT DATA PURGE: Are you sure you want to delete this signal from the database? This action is irreversible.")) return;
+    try {
+      await API.delete(`/social-monitor/${id}`);
+      setPosts(prev => prev.filter(p => p._id !== id));
+    } catch (err) {
+      console.error('Dismissal Failed:', err);
+      alert('Error dismissing signal');
+    }
+  };
+
+  const handlePurge = async () => {
+    if (!window.confirm("CRITICAL PURGE: Permanently delete ALL intelligence records in this feed? This is irreversible.")) return;
+    try {
+       await API.delete('/social-monitor/purge');
+       setPosts([]);
+    } catch (err) {
+       console.error('Purge Failed:', err);
+       alert('Failed to purge neural feed');
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-6 space-y-8">
+    <div className="w-full py-8 px-6 space-y-8">
       {/* Tactical Header */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-b border-slate-100 pb-8">
         <div className="space-y-1">
@@ -81,17 +97,26 @@ const SocialMonitor = () => {
           </div>
           <p className="text-sm font-medium text-slate-500 pl-14">Deep-Stream Intelligence Feed &amp; Signal Analysis</p>
         </div>
-        <button 
-          onClick={handleScan}
-          disabled={scanning}
-          className="bg-blue-600 text-white px-8 py-3.5 rounded-full font-semibold hover:bg-blue-700 hover:-translate-y-0.5 hover:shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 flex items-center gap-3"
-        >
-          {scanning ? <RefreshCw className="animate-spin" size={18} /> : <Zap size={18} />}
-          {scanning ? 'Syncing Feeds...' : 'Initialize Deep Scan'}
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={handlePurge}
+            className="p-3.5 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full border border-slate-100 transition-all hover:scale-110"
+            title="Terminal Purge (Hard Delete All)"
+          >
+             <Trash2 size={20} />
+          </button>
+          <button 
+            onClick={handleScan}
+            disabled={scanning}
+            className="bg-blue-600 text-white px-8 py-3.5 rounded-full font-semibold hover:bg-blue-700 hover:-translate-y-0.5 hover:shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 flex items-center gap-3"
+          >
+            {scanning ? <RefreshCw className="animate-spin" size={18} /> : <Zap size={18} />}
+            {scanning ? 'Syncing Feeds...' : 'Initialize Deep Scan'}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 xxl:grid-cols-4 gap-8">
         {/* Main Intelligence Feed */}
         <div className="xl:col-span-3 space-y-4">
           {loading ? (
@@ -174,12 +199,19 @@ const SocialMonitor = () => {
                         </button>
                         
                         {user?.role === 'admin' && (
-                          <>
+                          <div className="flex items-center gap-2">
                             <div className="w-px h-6 bg-slate-200" />
-                            <button onClick={() => handleAssignForce(post)} className="flex items-center gap-2 text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest bg-red-50 px-3 py-1.5 rounded-full">
+                            <button onClick={() => handleConvertToSOS(post)} className="flex items-center gap-2 text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest bg-red-50 px-3 py-1.5 rounded-full">
                                <ShieldAlert size={14} /> Convert to SOS
                             </button>
-                          </>
+                            <button 
+                              onClick={() => handleDismiss(post._id)} 
+                              title="Dismiss Signal" 
+                              className="bg-slate-100 text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"
+                            >
+                               <XCircle size={18} />
+                            </button>
+                          </div>
                         )}
                      </div>
                      <a 

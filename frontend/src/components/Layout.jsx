@@ -14,8 +14,8 @@ const Navbar = () => {
   };
 
   return (
-    <div className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-gray-900/10">
-      <nav className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+    <div className="fixed top-0 w-full z-50 pointer-events-none">
+      <nav className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between bg-white/90 backdrop-blur-md border-b border-gray-900/10 pointer-events-auto">
         <Link to="/" className="flex items-center gap-3 group decoration-none">
           <div className="bg-blue-600 p-2.5 rounded-xl text-white shadow-md shadow-blue-600/20">
             <ShieldAlert size={20} />
@@ -33,7 +33,7 @@ const Navbar = () => {
             { name: 'Live Intel', path: '/map' },
             { name: 'Fundraising', path: '/fundraising' },
             { name: 'Social Watch', path: '/social-monitor' },
-            { name: 'Support', path: '/mental-health' },
+            ...(user && user.role === 'victim' ? [{ name: 'Support', path: '/mental-health' }] : []),
           ].map((link) => (
             <Link 
               key={link.path}

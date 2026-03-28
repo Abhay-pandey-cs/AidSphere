@@ -37,12 +37,12 @@ const WeatherAlerts = () => {
     <>
       {/* Animated Drop-Down Toast (Slides from top) */}
       <div 
-        className={`fixed top-8 right-8 z-[1100] w-96 transform transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-          latestAlert ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-full opacity-0 scale-95 pointer-events-none'
+        className={`fixed top-8 right-8 z-[1100] w-96 transform transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
+          latestAlert ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-full opacity-0 scale-95'
         }`}
       >
         {latestAlert && (
-          <div className="bg-white border-2 border-red-100 text-slate-800 p-6 rounded-3xl shadow-[0_20px_50px_rgba(220,38,38,0.1)] relative overflow-hidden group">
+          <div className="bg-white border-2 border-red-100 text-slate-800 p-6 rounded-3xl shadow-[0_20px_50px_rgba(220,38,38,0.1)] relative overflow-hidden group pointer-events-auto">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-red-500">
                <Activity size={80} />
             </div>

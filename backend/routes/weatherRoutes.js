@@ -7,7 +7,7 @@ router.get('/alerts', async (req, res) => {
     // Fetch live global 4.5+ magnitude earthquakes in the last 24h
     const { data } = await axios.get('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson');
     const features = data.features.slice(0, 3); // Max 3 popups to prevent UI clutter
-    
+
     if (features.length === 0) {
       return res.json([]);
     }

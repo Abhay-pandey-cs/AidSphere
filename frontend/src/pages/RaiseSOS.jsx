@@ -129,7 +129,10 @@ const RaiseSOS = () => {
         </div>
         <div className="flex flex-col items-start md:items-end gap-4 w-full md:w-auto mt-6 md:mt-0">
            <button 
-             onClick={() => setShowCamera(true)}
+             onClick={() => {
+               console.log('Initializing AI Lens... Current State:', showCamera);
+               setShowCamera(true);
+             }}
              className="bg-gray-900 text-white px-8 py-5 text-xs font-black uppercase tracking-[0.3em] hover:bg-black transition-all flex items-center gap-4 shadow-xl shadow-gray-200"
            >
              Launch AI Scanning Lens <Camera size={18} />
@@ -260,6 +263,7 @@ const RaiseSOS = () => {
 
       {showCamera && (
         <SOSCamera 
+          missionCategory={selectedCategory?.label || 'General Emergency'}
           onCapture={handleAiCapture} 
           onClose={() => setShowCamera(false)} 
         />

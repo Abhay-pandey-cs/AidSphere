@@ -10,7 +10,8 @@ const Signup = () => {
     email: '',
     password: '',
     phone: '',
-    role: 'victim'
+    role: 'victim',
+    volunteerType: 'untrained'
   });
   const [error, setError] = useState('');
   const [rawError, setRawError] = useState('');
@@ -130,6 +131,38 @@ const Signup = () => {
                ))}
              </div>
           </div>
+
+          {formData.role === 'volunteer' && (
+            <div className="space-y-4 pt-4 border-t border-gray-100 animate-[fadeIn_0.3s_ease-in-out]">
+               <label className="tactical-text text-blue-600 font-bold flex items-center gap-2">
+                 <Shield size={14} /> Volunteer Classification
+               </label>
+               <div className="grid grid-cols-2 gap-4">
+                  <button
+                   type="button"
+                   onClick={() => setFormData({...formData, volunteerType: 'trained'})}
+                   className={`p-4 border transition-all text-center tactical-text text-[9px] uppercase font-black tracking-widest flex items-center justify-center gap-2 ${
+                     formData.volunteerType === 'trained' 
+                     ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-inner' 
+                     : 'bg-white text-gray-400 border-gray-200 hover:border-blue-100 cursor-pointer'
+                   }`}
+                 >
+                   <Briefcase size={12} /> Trained Med/Rescue
+                 </button>
+                 <button
+                   type="button"
+                   onClick={() => setFormData({...formData, volunteerType: 'untrained'})}
+                   className={`p-4 border transition-all text-center tactical-text text-[9px] uppercase font-black tracking-widest flex items-center justify-center gap-2 ${
+                     formData.volunteerType === 'untrained' 
+                     ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-inner' 
+                     : 'bg-white text-gray-400 border-gray-200 hover:border-blue-100 cursor-pointer'
+                   }`}
+                 >
+                   <PlusCircle size={12} /> Untrained / Core
+                 </button>
+               </div>
+            </div>
+          )}
 
           <button
             type="submit"

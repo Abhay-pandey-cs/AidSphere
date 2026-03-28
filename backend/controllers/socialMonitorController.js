@@ -34,7 +34,7 @@ const triggerScrape = async (req, res) => {
     try {
       let subreddits = 'india+delhi+mumbai+bangalore+kerala+chennai+pune+kolkata+hyderabad';
       let searchQuery = 'emergency OR help OR sos OR disaster OR rescue';
-      
+
       if (geoContext.city || geoContext.state) {
         const localTarget = (geoContext.city || geoContext.state).replace(/\s+/g, '');
         subreddits = `${localTarget}+india`;
@@ -45,23 +45,23 @@ const triggerScrape = async (req, res) => {
       const redditRes = await axios.get(`https://www.reddit.com/r/${subreddits}/search.json?q=${encodeURIComponent(searchQuery)}&restrict_sr=on&sort=new&limit=15`, {
         headers: { 'User-Agent': userAgent }
       });
-      
+
       const posts = redditRes.data?.data?.children || [];
       for (const post of posts) {
         const data = post.data;
         if (!data.title && !data.selftext) continue;
         const text = `${data.title} ${data.selftext}`.substring(0, 500);
-        
+
         // Multi-modal Extraction
         const imageUrl = data.url && (data.url.endsWith('.jpg') || data.url.endsWith('.png')) ? data.url : null;
-        
+
         // Wait for AI Assessment
         const aiEvaluation = await analyzeSignal(text, imageUrl);
-        
+
         // FILTER: AI drops post if not a true physical emergency
         if (!aiEvaluation.isDisaster) {
-          console.log(`[Reddit] Gemini Dropped: "${text.substring(0,40)}..." - Reason: ${aiEvaluation.aiReasoning}`);
-          continue; 
+          console.log(`[Reddit] Gemini Dropped: "${text.substring(0, 40)}..." - Reason: ${aiEvaluation.aiReasoning}`);
+          continue;
         }
 
         newSignals.push({
@@ -89,20 +89,20 @@ const triggerScrape = async (req, res) => {
         headers: { 'User-Agent': 'AidSphereProtocol/1.0.0' },
         timeout: 5000
       });
-      
+
       const reports = reliefRes.data?.data || [];
       if (reports.length > 0) {
         for (const report of reports) {
           const title = report.fields.title;
           const body = report.fields.body ? report.fields.body.substring(0, 300).replace(/<[^>]*>?/gm, '') : title;
-          
+
           const aiEvaluation = await analyzeSignal(`${title}. ${body}`);
-          
+
           if (!aiEvaluation.isDisaster) {
             console.log(`[ReliefWeb] Gemini Dropped: "${title}" - Reason: ${aiEvaluation.aiReasoning}`);
-            continue; 
+            continue;
           }
-          
+
           newSignals.push({
             originalId: `reliefweb_${report.id}`,
             platform: 'RELIEF_WEB',
@@ -126,14 +126,14 @@ const triggerScrape = async (req, res) => {
     try {
       const eonetRes = await axios.get('https://eonet.gsfc.nasa.gov/api/v3/events?limit=5&days=10', { timeout: 5000 });
       const events = eonetRes.data?.events || [];
-      
+
       for (const event of events) {
         if (!event.title) continue;
-        
+
         const aiEvaluation = await analyzeSignal(`NASA EONET Alert: ${event.title}`);
-        
+
         if (!aiEvaluation.isDisaster) {
-          continue; 
+          continue;
         }
 
         newSignals.push({
@@ -161,15 +161,15 @@ const triggerScrape = async (req, res) => {
       for (const status of statuses) {
         if (!status.content) continue;
         const text = status.content.replace(/<[^>]*>?/gm, '').substring(0, 300);
-        
+
         // Multi-modal Extraction
         const imageUrl = status.media_attachments?.find(m => m.type === 'image')?.url || null;
-        
+
         const aiEvaluation = await analyzeSignal(text, imageUrl);
-        
+
         if (!aiEvaluation.isDisaster) {
-          console.log(`[Mastodon] Gemini Dropped: "${text.substring(0,40)}..." - Reason: ${aiEvaluation.aiReasoning}`);
-          continue; 
+          console.log(`[Mastodon] Gemini Dropped: "${text.substring(0, 40)}..." - Reason: ${aiEvaluation.aiReasoning}`);
+          continue;
         }
 
         newSignals.push({
@@ -195,18 +195,19 @@ const triggerScrape = async (req, res) => {
       console.log("[Test Post] Sending Mock Flood Image to Gemini for strict verification...");
       const mockText = "URGENT: Entire lower district is submerged. Cars are completely floating and water has reached the second floor of some buildings. Need rescue boats immediately! People are trapped on roofs.";
       const mockImageUrl = "https://images.unsplash.com/photo-1547683905-f686c993aae5?q=80&w=1000&auto=format&fit=crop"; // Real flood image
-      
+
       const aiEvaluation = await analyzeSignal(mockText, mockImageUrl);
-      
+
       if (aiEvaluation.isDisaster) {
+        const todayKey = new Date().toISOString().split('T')[0];
         newSignals.push({
-          originalId: 'mock_verified_seed', // Fixed duplicacy bug
+          originalId: `seed_disaster_${todayKey}`,
           platform: 'GEMINI_VISION_TEST',
-          author: 'AI_Test_Node',
+          author: 'AidSphere_AI_Node',
           content: `${mockText}\n\n[AI_VISION_VERIFIED: ${aiEvaluation.aiReasoning}]`,
           timestamp: new Date(),
           location: { region: 'MAHARASHTRA_REGIONAL' },
-          link: mockImageUrl, 
+          link: mockImageUrl,
           neuralScore: aiEvaluation.confidenceScore,
           confidence: aiEvaluation.confidenceScore,
           sentiment: aiEvaluation.sentiment || 'critical',
@@ -221,27 +222,27 @@ const triggerScrape = async (req, res) => {
       const exists = await ScrapedSignal.findOne({ originalId: sig.originalId });
       if (!exists) {
         await ScrapedSignal.create(sig);
-        
+
         // AUTO-CONVERSION: Make visible on the main site Map if it's high confidence OR official
         if (sig.neuralScore > 80 || sig.platform === 'NASA_EONET' || sig.platform === 'RELIEF_WEB') {
-           await SOS.create({
-              user: req.user._id, // Assign to the Admin who triggered the scan
-              type: 'other',
-              category: 'disaster',
-              description: `[INTEL SOURCE: ${sig.platform}] ${sig.content}`,
-              location: { 
-                 lat: 20.5937 + (Math.random() * 2 - 1), // Semi-randomized around India
-                 lng: 78.9629 + (Math.random() * 2 - 1), 
-                 address: sig.location?.region || 'UNKNOWN' 
-              },
-              urgency: sig.neuralScore > 85 ? 'critical' : 'high',
+          await SOS.create({
+            user: req.user._id, // Assign to the Admin who triggered the scan
+            type: 'other',
+            category: 'disaster',
+            description: `[INTEL SOURCE: ${sig.platform}] ${sig.content}`,
+            location: {
+              lat: 20.5937 + (Math.random() * 2 - 1), // Semi-randomized around India
+              lng: 78.9629 + (Math.random() * 2 - 1),
+              address: sig.location?.region || 'UNKNOWN'
+            },
+            urgency: sig.neuralScore > 85 ? 'critical' : 'high',
+            status: 'pending',
+            logs: [{
               status: 'pending',
-              logs: [{
-                 status: 'pending',
-                 message: 'Auto-converted Authenticated Neural Signal to Main Site SOS',
-                 actor: req.user._id
-              }]
-           });
+              message: 'Auto-converted Authenticated Neural Signal to Main Site SOS',
+              actor: req.user._id
+            }]
+          });
         }
         addedCount++;
       }
@@ -287,7 +288,7 @@ const upvoteSignal = async (req, res) => {
       // Boost neural score slightly on upvote
       signal.neuralScore = Math.min(100, signal.neuralScore + 2);
     }
-    
+
     await signal.save();
     res.json(signal);
   } catch (err) {
@@ -296,5 +297,72 @@ const upvoteSignal = async (req, res) => {
   }
 };
 
-module.exports = { triggerScrape, getMonitoredFeed, upvoteSignal };
+const convertSignalToSOS = async (req, res) => {
+  try {
+    const signalId = req.params.id;
+    const signal = await ScrapedSignal.findById(signalId);
 
+    if (!signal) return res.status(404).json({ message: 'Signal not found' });
+    if (signal.status === 'verified') return res.status(400).json({ message: 'Signal already verified and converted' });
+
+    // Mark as verified
+    signal.status = 'verified';
+    await signal.save();
+
+    // Create a new SOS from the signal
+    const newSOS = await SOS.create({
+      user: req.user._id, // Admin who verified it
+      type: 'other',
+      category: 'disaster',
+      description: `[INTEL SOURCE: ${signal.platform}] ${signal.content} \n\nOriginal Author: ${signal.author} \nLink: ${signal.link || 'N/A'}`,
+      location: {
+        lat: signal.location?.lat || 20.5937 + (Math.random() * 2 - 1),
+        lng: signal.location?.lng || 78.9629 + (Math.random() * 2 - 1),
+        address: signal.location?.region || 'UNKNOWN'
+      },
+      urgency: signal.neuralScore > 85 ? 'critical' : 'high',
+      status: 'pending',
+      logs: [{
+        status: 'pending',
+        message: 'Admin Verified and Converted Scraped Signal to Official SOS',
+        actor: req.user._id
+      }]
+    });
+
+    // Populate user info for socket broadcast
+    const populatedSOS = await SOS.findById(newSOS._id).populate('user', 'name phone role');
+
+    // Emit socket event
+    if (req.io) {
+      req.io.emit('newSOS', populatedSOS);
+    }
+
+    res.json({ message: 'Successfully converted to SOS', sos: populatedSOS, signal });
+  } catch (error) {
+    console.error('Error converting signal to SOS:', error);
+    res.status(500).json({ message: 'Server error during conversion' });
+  }
+};
+
+const dismissSignal = async (req, res) => {
+  try {
+    const signalId = req.params.id;
+    await ScrapedSignal.findByIdAndDelete(signalId);
+    res.json({ message: 'Signal permanently purged', id: signalId });
+  } catch (error) {
+    console.error('Error dismissing signal:', error);
+    res.status(500).json({ message: 'Server error during signal dismissal' });
+  }
+};
+
+const purgeAllSignals = async (req, res) => {
+  try {
+    await ScrapedSignal.deleteMany({ status: 'pending' });
+    res.json({ message: 'Neural feed purged successfully' });
+  } catch (error) {
+    console.error('Purge error:', error);
+    res.status(500).json({ message: 'Failed to purge neural feed' });
+  }
+};
+
+module.exports = { triggerScrape, getMonitoredFeed, upvoteSignal, convertSignalToSOS, dismissSignal, purgeAllSignals };

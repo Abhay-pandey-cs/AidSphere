@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react';
+// UI_HARDENING_v2_ACTIVE
 import API from '../api/axios';
 import { SocketContext } from '../context/SocketContext';
 import { ShieldCheck, ShieldAlert, Users, CheckCircle, XCircle, Clock, ExternalLink, Share2, LayoutDashboard, ChevronRight, MessageSquare, MapPin, ArrowRight, Zap, Filter, Activity, BarChart3, Database, Globe, RefreshCw } from 'lucide-react';
@@ -100,8 +101,12 @@ const AdminDashboard = () => {
               ].map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => { setActiveTab('missions'); setFilter(item.id); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold ${
+                  onClick={() => { 
+                    console.log(`Sidebar: Switching to ${item.id}`);
+                    setActiveTab('missions'); 
+                    setFilter(item.id); 
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold relative z-30 ${
                     activeTab === 'missions' && filter === item.id 
                     ? 'bg-blue-50 text-blue-600 shadow-sm' 
                     : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
@@ -116,8 +121,8 @@ const AdminDashboard = () => {
            <div className="space-y-2">
               <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider pl-4">Intelligence</span>
               <button
-                onClick={() => setActiveTab('force')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold ${
+                onClick={() => { console.log('Admin_Switch: Force'); setActiveTab('force'); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold relative z-30 ${
                   activeTab === 'force' 
                   ? 'bg-blue-50 text-blue-600 shadow-sm' 
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
@@ -127,8 +132,8 @@ const AdminDashboard = () => {
                 <span className="hidden lg:block text-xs">Force Management</span>
               </button>
               <button
-                onClick={() => setActiveTab('signals')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold ${
+                onClick={() => { console.log('Admin_Switch: Signals'); setActiveTab('signals'); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold relative z-30 ${
                   activeTab === 'signals' 
                   ? 'bg-blue-50 text-blue-600 shadow-sm' 
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
@@ -150,61 +155,62 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 overflow-auto">
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-px bg-gray-200 min-h-full">
+        <div className={`grid grid-cols-1 gap-px bg-gray-200 min-h-full ${activeTab === 'missions' ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
            
-           {/* Deployment Matrix (List) */}
-           <div className="bg-white p-8 space-y-8 h-screen overflow-auto">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-50/50 p-6 rounded-3xl border border-slate-100 gap-4">
-                 <div>
-                    <h2 className="text-xl font-bold tracking-tight text-slate-800">Deployment Matrix</h2>
-                    <p className="font-medium text-xs text-slate-500 mt-1">Total Synchronized Signals: {sosRequests.length}</p>
-                 </div>
-                 <div className="flex gap-3">
-                    <button onClick={() => alert('Coming Soon!')} className="p-2.5 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all"><Filter size={18} /></button>
-                    <button onClick={fetchSOS} className="p-2.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-all"><RefreshCw size={18} /></button>
-                 </div>
-              </div>
+           {/* Deployment Matrix (List) - Hide when in signals/force mode for stability */}
+           {activeTab === 'missions' && (
+             <div className="bg-white p-8 space-y-8 h-screen overflow-auto">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-50/50 p-6 rounded-3xl border border-slate-100 gap-4">
+                   <div>
+                      <h2 className="text-xl font-bold tracking-tight text-slate-800">Deployment Matrix</h2>
+                      <p className="font-medium text-xs text-slate-500 mt-1">Total Synchronized Signals: {sosRequests.length}</p>
+                   </div>
+                   <div className="flex gap-3">
+                      <button onClick={() => alert('Coming Soon!')} className="p-2.5 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all"><Filter size={18} /></button>
+                      <button onClick={fetchSOS} className="p-2.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-all"><RefreshCw size={18} /></button>
+                   </div>
+                </div>
 
-              <div className="space-y-3">
-                 {loading ? (
-                   <div className="space-y-3">
-                      {[1, 2, 3, 4, 5].map(i => <MissionSkeleton key={i} />)}
-                   </div>
-                 ) : filteredSOS.map(sos => (
-                   <div 
-                     key={sos._id}
-                     onClick={() => setSelectedSOS(sos)}
-                     className={`industrial-card p-4 cursor-pointer hover:border-gray-900 transition-all flex items-center gap-4 ${
-                       selectedSOS?._id === sos._id ? 'border-gray-900 bg-gray-50 ring-1 ring-gray-900' : ''
-                     }`}
-                   >
-                     <div className={`w-2 h-12 ${
-                        sos.urgency === 'critical' ? 'bg-red-600' : 
-                        sos.urgency === 'high' ? 'bg-orange-500' : 'bg-blue-500'
-                     }`} />
-                     
-                     <div className="flex-1 space-y-1">
-                        <div className="flex justify-between items-start">
-                           <span className="tactical-text text-gray-400">MISSION_ID: <span className="text-gray-900 font-mono">{sos._id.slice(-8).toUpperCase()}</span></span>
-                           <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border ${
-                              sos.status === 'pending' ? 'border-red-200 text-red-600 bg-red-50' : 
-                              sos.status === 'dispatched' ? 'border-blue-200 text-blue-600 bg-blue-50' : 
-                              sos.status === 'resolved' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-gray-200 text-gray-600 bg-gray-50'
-                           }`}>
-                              {sos.status}
-                           </span>
-                        </div>
-                        <p className="text-xs font-bold text-gray-700 truncate">{sos.description}</p>
-                        <div className="flex items-center gap-3 text-[9px] font-mono text-gray-400">
-                           <MapPin size={10} /> {sos.location?.address || 'UNKNOWN_COORD'}
-                        </div>
+                <div className="space-y-3">
+                   {loading ? (
+                     <div className="space-y-3">
+                        {[1, 2, 3, 4, 5].map(i => <MissionSkeleton key={i} />)}
                      </div>
-                   </div>
-                 ))}
-              </div>
-           </div>
+                   ) : filteredSOS.map(sos => (
+                     <div 
+                       key={sos._id}
+                       onClick={() => setSelectedSOS(sos)}
+                       className={`industrial-card p-4 cursor-pointer hover:border-gray-900 transition-all flex items-center gap-4 ${
+                         selectedSOS?._id === sos._id ? 'border-gray-900 bg-gray-50 ring-1 ring-gray-900' : ''
+                       }`}
+                     >
+                       <div className={`w-2 h-12 ${
+                          sos.urgency === 'critical' ? 'bg-red-600' : 
+                          sos.urgency === 'high' ? 'bg-orange-500' : 'bg-blue-500'
+                       }`} />
+                       
+                       <div className="flex-1 space-y-1">
+                          <div className="flex justify-between items-start">
+                             <span className="tactical-text text-gray-400">MISSION_ID: <span className="text-gray-900 font-mono">{sos._id.slice(-8).toUpperCase()}</span></span>
+                             <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border ${
+                                sos.status === 'pending' ? 'border-red-200 text-red-600 bg-red-50' : 
+                                sos.status === 'dispatched' ? 'border-blue-200 text-blue-600 bg-blue-50' : 
+                                sos.status === 'resolved' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-gray-200 text-gray-600 bg-gray-50'
+                             }`}>
+                                {sos.status}
+                             </span>
+                          </div>
+                          <p className="text-xs font-bold text-gray-700 truncate">{sos.description}</p>
+                          <div className="flex items-center gap-3 text-[9px] font-mono text-gray-400">
+                             <MapPin size={10} /> {sos.location?.address || 'UNKNOWN_COORD'}
+                          </div>
+                       </div>
+                     </div>
+                   ))}
+                </div>
+             </div>
+           )}
 
            {activeTab === 'missions' && (
              <div className="bg-gray-50/50 p-8 h-screen overflow-auto w-full relative">
